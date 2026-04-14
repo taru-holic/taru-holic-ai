@@ -9,8 +9,15 @@ from datetime import datetime, timedelta
 st.set_page_config(page_title="TARU HOLIC AI", page_icon="🛢️", layout="wide")
 
 # APIキー（Streamlit Cloudではsecretsから取得）
-API_KEY = st.secrets.get("ANTHROPIC_API_KEY", os.environ.get("ANTHROPIC_API_KEY", ""))
-SHOPIFY_TOKEN = st.secrets.get("SHOPIFY_ACCESS_TOKEN", os.environ.get("SHOPIFY_ACCESS_TOKEN", ""))
+try:
+    API_KEY = st.secrets["ANTHROPIC_API_KEY"]
+except:
+    API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+
+try:
+    SHOPIFY_TOKEN = st.secrets["SHOPIFY_ACCESS_TOKEN"]
+except:
+    SHOPIFY_TOKEN = os.environ.get("SHOPIFY_ACCESS_TOKEN", "")
 SHOP = "wake-up-wine-japan.myshopify.com"
 SHOPIFY_HEADERS = {"X-Shopify-Access-Token": SHOPIFY_TOKEN}
 
