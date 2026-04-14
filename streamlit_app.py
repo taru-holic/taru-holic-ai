@@ -109,7 +109,7 @@ AGENT_NAMES = {
 }
 
 def route(user_input):
-    response = client.messages.create(model="claude-sonnet-4-6", max_tokens=50,
+    response = client.messages.create(model="claude-3-5-sonnet-20241022", max_tokens=50,
                                        system=ORCHESTRATOR_PROMPT,
                                        messages=[{"role": "user", "content": user_input}])
     return response.content[0].text.strip()
@@ -126,7 +126,7 @@ def call_agent(agent_key, user_input):
             enhanced_input = f"{user_input}\n\n【実際のShopify売上データ】\n{sales_data}"
         except:
             pass
-    response = client.messages.create(model="claude-sonnet-4-6", max_tokens=2000,
+    response = client.messages.create(model="claude-3-5-sonnet-20241022", max_tokens=2000,
                                        system=prompt,
                                        messages=[{"role": "user", "content": enhanced_input}])
     return response.content[0].text
