@@ -10,16 +10,22 @@ st.set_page_config(page_title="TARU HOLIC AI", page_icon="🛢️", layout="wide
 
 # APIキー（Streamlit Cloudではsecretsから取得）
 try:
-    API_KEY = st.secrets["ANTHROPIC_API_KEY"]
+    API_KEY = st.secrets["ANTHROPIC_API_KEY"].strip()
 except:
-    API_KEY = os.environ.get("ANTHROPIC_API_KEY", "")
+    API_KEY = os.environ.get("ANTHROPIC_API_KEY", "").strip()
 
 try:
-    SHOPIFY_TOKEN = st.secrets["SHOPIFY_ACCESS_TOKEN"]
+    SHOPIFY_TOKEN = st.secrets["SHOPIFY_ACCESS_TOKEN"].strip()
 except:
-    SHOPIFY_TOKEN = os.environ.get("SHOPIFY_ACCESS_TOKEN", "")
+    SHOPIFY_TOKEN = os.environ.get("SHOPIFY_ACCESS_TOKEN", "").strip()
+
 SHOP = "wake-up-wine-japan.myshopify.com"
 SHOPIFY_HEADERS = {"X-Shopify-Access-Token": SHOPIFY_TOKEN}
+
+# APIキーチェック
+if not API_KEY:
+    st.error("ANTHROPIC_API_KEY が設定されていません")
+    st.stop()
 
 client = anthropic.Anthropic(api_key=API_KEY)
 
