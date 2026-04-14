@@ -3,7 +3,10 @@ import streamlit as st
 import anthropic
 import os
 import requests
+import base64
+import io
 from datetime import datetime, timedelta
+from pypdf import PdfReader
 
 # ページ設定
 st.set_page_config(page_title="TARU HOLIC AI", page_icon="🛢️", layout="wide")
@@ -137,11 +140,49 @@ def call_agent(agent_key, user_input):
                                        messages=[{"role": "user", "content": enhanced_input}])
     return response.content[0].text
 
+# 画像・PDF処理関数
+def process_image(uploaded_file):
+    """画像をbase64エンコード"""
+    bytes_data = uploaded_file.getvalue()
+    base64_image = base64.b64encode(bytes_data).decode("utf-8")
+    media_type = uploaded_file.type
+    return base64_image, media_type
+
+def process_pdf(uploaded_file):
+    """PDFからテキストを抽出"""
+    pdf_reader = PdfReader(io.BytesIO(uploaded_file.getvalue()))
+    text = ""
+    for page in pdf_reader.pages[:10]:  # 最大10ページ
+        text += page.extract_text() + "\n"
+    return text[:5000]  # 最大5000文字
+
+def call_agent_with_image(agent_key, user_input, image_data, media_type):
+    """画像付きでエージェントを呼び出し"""
+    prompt = AGENTS.get(agent_key)
+    if not prompt:
+        return None
+
+    messages = [{
+        "role": "user",
+        "content": [
+            {"type": "image", "source": {"type": "base64", "media_type": media_type, "data": image_data}},
+            {"type": "text", "text": user_input}
+        ]
+    }]
+
+    response = client.messages.create(
+        model="claude-haiku-4-5-20251001",
+        max_tokens=2000,
+        system=prompt,
+        messages=messages
+    )
+    return response.content[0].text
+
 # UI
 st.title("🛢️ TARU HOLIC AI")
 st.caption("マルチエージェントシステム｜クリエイティブ / 商品戦略 / チャネル / 財務・在庫 / ブランド / CX / 採用")
 
-# サイドバー：売上ダッシュボード
+# サイドバー
 with st.sidebar:
     st.header("📊 売上ダッシュボード")
     if st.button("売上を更新"):
@@ -150,6 +191,18 @@ with st.sidebar:
                 st.text(get_sales_summary())
             except Exception as e:
                 st.error(f"エラー: {e}")
+
+    st.divider()
+    st.header("📎 ファイルアップロード")
+    uploaded_file = st.file_uploader(
+        "画像またはPDFをアップロード",
+        type=["png", "jpg", "jpeg", "gif", "webp", "pdf"]
+    )
+    if uploaded_file:
+        if uploaded_file.type == "application/pdf":
+            st.success(f"PDF: {uploaded_file.name}")
+        else:
+            st.image(uploaded_file, caption=uploaded_file.name, width=200)
 
 # メインチャット
 if "messages" not in st.session_state:
@@ -169,10 +222,26 @@ if prompt := st.chat_input("質問を入力してください"):
             agents = route(prompt)
             agent_keys = [a.strip() for a in agents.split(",")]
             full_response = ""
+
             for key in agent_keys:
                 name = AGENT_NAMES.get(key, key)
-                result = call_agent(key, prompt)
+
+                # ファイルがアップロードされている場合
+                if uploaded_file:
+                    if uploaded_file.type == "application/pdf":
+                        # PDF: テキスト抽出して追加
+                        pdf_text = process_pdf(uploaded_file)
+                        enhanced_prompt = f"{prompt}\n\n【添付PDFの内容】\n{pdf_text}"
+                        result = call_agent(key, enhanced_prompt)
+                    else:
+                        # 画像: Vision APIで処理
+                        image_data, media_type = process_image(uploaded_file)
+                        result = call_agent_with_image(key, prompt, image_data, media_type)
+                else:
+                    result = call_agent(key, prompt)
+
                 if result:
                     full_response += f"**【{name}エージェント】**\n\n{result}\n\n---\n\n"
+
             st.markdown(full_response)
             st.session_state.messages.append({"role": "assistant", "content": full_response})
