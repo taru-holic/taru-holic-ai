@@ -192,17 +192,45 @@ with st.sidebar:
             except Exception as e:
                 st.error(f"エラー: {e}")
 
-    st.divider()
-    st.header("📎 ファイルアップロード")
-    uploaded_file = st.file_uploader(
-        "画像またはPDFをアップロード",
-        type=["png", "jpg", "jpeg", "gif", "webp", "pdf"]
-    )
-    if uploaded_file:
+
+# ファイルアップロード（チャットの上）
+uploaded_file = st.file_uploader(
+    "📎 画像・PDFをドロップまたは選択（LPやデザインのレビューなど）",
+    type=["png", "jpg", "jpeg", "gif", "webp", "pdf"]
+)
+
+if uploaded_file:
+    col1, col2 = st.columns([1, 2])
+    with col1:
         if uploaded_file.type == "application/pdf":
-            st.success(f"PDF: {uploaded_file.name}")
+            st.info(f"📄 {uploaded_file.name}")
         else:
-            st.image(uploaded_file, caption=uploaded_file.name, width=200)
+            st.image(uploaded_file, width=150)
+    with col2:
+        auto_prompt = st.text_input("質問（空欄なら自動分析）", key="file_prompt", placeholder="例: このLPの改善点は？")
+        if st.button("🔍 分析する", type="primary"):
+            default_prompt = "この画像/PDFを分析してフィードバックをください"
+            prompt_to_use = auto_prompt if auto_prompt else default_prompt
+
+            with st.spinner("分析中..."):
+                agents = route(prompt_to_use)
+                agent_keys = [a.strip() for a in agents.split(",")]
+                full_response = ""
+
+                for key in agent_keys:
+                    name = AGENT_NAMES.get(key, key)
+                    if uploaded_file.type == "application/pdf":
+                        pdf_text = process_pdf(uploaded_file)
+                        enhanced_prompt = f"{prompt_to_use}\n\n【添付PDFの内容】\n{pdf_text}"
+                        result = call_agent(key, enhanced_prompt)
+                    else:
+                        image_data, media_type = process_image(uploaded_file)
+                        result = call_agent_with_image(key, prompt_to_use, image_data, media_type)
+                    if result:
+                        full_response += f"**【{name}エージェント】**\n\n{result}\n\n---\n\n"
+
+                st.markdown(full_response)
+    st.divider()
 
 # メインチャット
 if "messages" not in st.session_state:
@@ -225,21 +253,7 @@ if prompt := st.chat_input("質問を入力してください"):
 
             for key in agent_keys:
                 name = AGENT_NAMES.get(key, key)
-
-                # ファイルがアップロードされている場合
-                if uploaded_file:
-                    if uploaded_file.type == "application/pdf":
-                        # PDF: テキスト抽出して追加
-                        pdf_text = process_pdf(uploaded_file)
-                        enhanced_prompt = f"{prompt}\n\n【添付PDFの内容】\n{pdf_text}"
-                        result = call_agent(key, enhanced_prompt)
-                    else:
-                        # 画像: Vision APIで処理
-                        image_data, media_type = process_image(uploaded_file)
-                        result = call_agent_with_image(key, prompt, image_data, media_type)
-                else:
-                    result = call_agent(key, prompt)
-
+                result = call_agent(key, prompt)
                 if result:
                     full_response += f"**【{name}エージェント】**\n\n{result}\n\n---\n\n"
 
